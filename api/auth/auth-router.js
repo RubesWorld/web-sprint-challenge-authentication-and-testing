@@ -1,7 +1,37 @@
-const router = require('express').Router();
+const router = require("express").Router();
+const bcryptjs = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-router.post('/register', (req, res) => {
-  res.end('implement register, please!');
+const Users = require("../users/user-models");
+const { jwtSecrets } = require("../../config/secrets");
+const { isValid } = require("../users/users-service");
+
+//? can't the isValid also be a middleware?
+router.post("/register", (req, res) => {
+  const credentials = req.body;
+
+  if (isValid(credentials)) {
+    const hashTime = process.env.BCRYPT_ROUNDS || 8;
+
+    //*hash the password
+    const hash = bcryptjs.hashSync(credentials.password, hashTime);
+
+    credentials.password = hash;
+
+    //*adding HASHED pw & user to db
+    Users.add(credentials)
+      .then((user) => {
+        res.status(201).json({ data: user });
+      })
+      .catch((err) => {
+        res.status(500).json({ message: err.message });
+      });
+  } else {
+    res
+      .status(400)
+      .json({ message: "Please provide a proper username and password. " });
+  }
+
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
@@ -28,8 +58,39 @@ router.post('/register', (req, res) => {
   */
 });
 
-router.post('/login', (req, res) => {
-  res.end('implement login, please!');
+router.post("/login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (isValid(req.body)) {
+    Users.findBy({ username: username })
+      .then(([user]) => {
+        if (user && bcryptjs.compareSync(password, user.password)) {
+          const token = makeToken(user);
+          res
+            .status(200)
+            .json({ message: "Welcome to the API " + user.username, token });
+        }
+      })
+      .catch((err) => {
+        res.status(500).json({ message: err.message });
+      });
+  } else {
+    res.status(400).json({
+      message: "Please provide a password and username",
+    });
+  }
+
+  function makeToken(user) {
+    const payload = {
+      subject: user.id,
+      username: user.username,
+    };
+    const options = {
+      expiresIn: "20m",
+    };
+    return jwt.sign(payload, jwtSecrets, options);
+  }
+
   /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.

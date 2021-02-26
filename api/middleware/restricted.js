@@ -1,5 +1,20 @@
-module.exports = (req, res, next) => {
-  next();
+const { jwtSecrets } = require("../../config/secrets");
+const jwt = require("jsonwebtoken");
+
+const restrict = (req, res, next) => {
+  const token = req.headers.authorization;
+
+  !token
+    ? res.status(401).json("You are not authorized")
+    : jwt.verify(token, jwtSecrets, (err, decoded) => {
+        if (err) {
+          res.status(401).json("This token is not valud" + err.message);
+        } else {
+          req.decodedToken = decoded;
+          next();
+        }
+      });
+
   /*
     IMPLEMENT
 
@@ -12,3 +27,4 @@ module.exports = (req, res, next) => {
       the response body should include a string exactly as follows: "token invalid".
   */
 };
+module.exports = restrict;
