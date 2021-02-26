@@ -6,8 +6,10 @@ const Users = require("../users/user-models");
 const { jwtSecrets } = require("../../config/secrets");
 const { isValid } = require("../users/users-service");
 
+const mw = require("../middleware/auth-middleware");
+
 //? can't the isValid also be a middleware?
-router.post("/register", (req, res) => {
+router.post("/register", mw.validateAuth, mw.checkUsernameInDB, (req, res) => {
   const credentials = req.body;
 
   if (isValid(credentials)) {
@@ -21,7 +23,7 @@ router.post("/register", (req, res) => {
     //*adding HASHED pw & user to db
     Users.add(credentials)
       .then((user) => {
-        res.status(201).json({ data: user });
+        res.status(201).json(user);
       })
       .catch((err) => {
         res.status(500).json({ message: err.message });
@@ -58,7 +60,7 @@ router.post("/register", (req, res) => {
   */
 });
 
-router.post("/login", (req, res) => {
+router.post("/login", mw.validateAuth, (req, res) => {
   const { username, password } = req.body;
 
   if (isValid(req.body)) {
@@ -66,32 +68,36 @@ router.post("/login", (req, res) => {
       .then(([user]) => {
         if (user && bcryptjs.compareSync(password, user.password)) {
           const token = makeToken(user);
+
           res
             .status(200)
             .json({ message: "Welcome to the API " + user.username, token });
+        } else {
+          res.status(401).json({
+            message: "invalid credentials",
+          });
         }
       })
       .catch((err) => {
         res.status(500).json({ message: err.message });
       });
   } else {
-    res.status(400).json({
-      message: "Please provide a password and username",
-    });
+    res.status(400).json({ message: "Please provide username and password" });
   }
+});
 
-  function makeToken(user) {
-    const payload = {
-      subject: user.id,
-      username: user.username,
-    };
-    const options = {
-      expiresIn: "20m",
-    };
-    return jwt.sign(payload, jwtSecrets, options);
-  }
+function makeToken(user) {
+  const payload = {
+    subject: user.id,
+    username: user.username,
+  };
+  const options = {
+    expiresIn: "20m",
+  };
+  return jwt.sign(payload, jwtSecrets, options);
+}
 
-  /*
+/*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
 
@@ -114,6 +120,5 @@ router.post("/login", (req, res) => {
     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
       the response body should include a string exactly as follows: "invalid credentials".
   */
-});
 
 module.exports = router;

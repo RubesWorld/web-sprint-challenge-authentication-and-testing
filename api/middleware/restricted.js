@@ -5,10 +5,10 @@ const restrict = (req, res, next) => {
   const token = req.headers.authorization;
 
   !token
-    ? res.status(401).json("You are not authorized")
+    ? res.status(401).json("Token required")
     : jwt.verify(token, jwtSecrets, (err, decoded) => {
         if (err) {
-          res.status(401).json("This token is not valud" + err.message);
+          res.status(401).json("Token invalid" + err.message);
         } else {
           req.decodedToken = decoded;
           next();
